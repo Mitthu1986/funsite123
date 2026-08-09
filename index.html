@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="src/output.css">
+    <style>
+        @font-face {
+            font-family: "Adorable";
+            src: url("./adorable.ttf") format("truetype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        .adorable-text {
+            font-family: "Adorable", cursive;
+        }
+    </style>
+</head>
+<body class="min-h-screen w-full bg-[url('/bg.jpg')] bg-cover bg-center bg-no-repeat">
+    <p class="adorable-text absolute left-1/2 my-15 z-10 -translate-x-1/2 -translate-y-1/2 rounded-xl px-4 py-2 text-center text-8xl font-bold text-black">
+        <span class="text-pink-500 inline-block animate-bounce-slower">S</span><span class="text-orange-500 animate-bounce-slow inline-block ">m</span><span class="text-yellow-500 inline-block animate-bounce">i</span><span class="text-green-500 animate-bounce-fast inline-block ">l</span><span class="text-blue-500 animate-bounce-faster inline-block ">e</span> <span class="text-pink-500 animate-bounce-quick inline-block ">t</span><span class="text-orange-500 animate-bounce-quick inline-block ">o</span> <span class="text-green-500 animate-bounce-faster inline-block ">s</span><span class="text-blue-500 animate-bounce-fast inline-block ">t</span><span class="text-purple-500 animate-bounce inline-block ">a</span><span class="text-pink-500 animate-bounce-slow inline-block ">r</span><span class="text-orange-500 animate-bounce-slower inline-block ">t</span>
+    </p>
+    <div class="flex min-h-screen items-center justify-center pr-6 sm:pr-10 lg:pr-16 ">
+        <div class="relative flex h-[280px] w-[320px] max-w-[85vw] sm:h-[360px] sm:w-[420px]">
+            <video
+                id="camera-feed"
+                class="absolute inset-0 mt-8 h-full w-full rounded-2xl border border-white/20 bg-black object-cover shadow-2xl"
+                autoplay
+                playsinline
+                muted
+            ></video>
+            <img
+                src="frame.png"
+                alt="Video frame"
+                class="absolute inset-0 h-full w-full object-contain pointer-events-none
+                scale-[1.4] sm:scale-[1.6]
+                -mt-5
+                "
+            >
+            <img
+                id="preview"
+                class="absolute inset-0 mt-8 h-full w-full rounded-2xl border border-white/20 bg-transparent object-cover shadow-2xl"
+                alt="Captured preview"
+            />
+            <img
+                src="frame.png"
+                alt="Video frame"
+                class="absolute inset-0 h-full w-full object-contain pointer-events-none
+                scale-[1.4] sm:scale-[1.6]
+                -mt-5
+                "
+            >
+            <button
+                id="capture-button"
+                class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/20 px-4 py-2 text-white backdrop-blur-sm transition hover:bg-white/30"
+            >
+                Capture
+            </button>
+           
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
