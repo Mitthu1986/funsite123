@@ -16,28 +16,23 @@
                 autoplay
                 playsinline
                 muted
-            ></video>
-            <img
-                src="frame.png"
-                alt="Video frame"
-                class="absolute inset-0 h-full w-full object-contain pointer-events-none
-                scale-[1.4] sm:scale-[1.6]
-                -mt-5
-                "
             >
-            <img
-                id="preview"
-                class="absolute inset-0 mt-8 h-full w-full rounded-2xl border border-white/20 bg-transparent object-cover shadow-2xl"
-                alt="Captured preview"
-            />
-            <img
-                src="frame.png"
-                alt="Video frame"
-                class="absolute inset-0 h-full w-full object-contain pointer-events-none
-                scale-[1.4] sm:scale-[1.6]
-                -mt-5
-                "
+                <canvas
+                    id="preview"
+                    aria-label="Captured preview"
+                    class="absolute inset-0 h-full w-full rounded-2xl border border-white/20 bg-transparent object-cover shadow-2xl"
+                ></canvas>
+            </video>
+            <div
+                id="preview-frame-wrapper"
+                class="absolute inset-0 h-full w-full pointer-events-none"
             >
+                <img
+                    src="frame.png"
+                    alt="Video frame"
+                    class="absolute inset-0 h-full w-full object-contain scale-[1.4] sm:scale-[1.6] -mt-5"
+                >
+            </div>
             </div>
             <div class="group relative">
                 <img 
@@ -54,21 +49,32 @@
                 alt="Switch on button"
                 />
                 </div>
-                <script>
-                    const switchButton = document.getElementById('switch');
-                    const switchOnButton = document.getElementById('switch-on');
-
-                    switchButton.addEventListener('click', () => {
-                        switchButton.classList.add('hidden');
-                        switchOnButton.classList.remove('hidden');
-                    });
-
-                    switchOnButton.addEventListener('click', () => {
-                        switchOnButton.classList.add('hidden');
-                        switchButton.classList.remove('hidden');
-                    });
-                </script>
             </div>
 <script src="main.js"></script>
+<script>
+    (function() {
+        const video = document.getElementById('camera-feed');
+        const previewCanvas = document.getElementById('preview');
+        const switchButton = document.getElementById('switch');
+        const switchOnButton = document.getElementById('switch-on');
+        const FILTER_CLASSES = ['filter', 'contrast-100', 'brightness-150', 'saturate-100', 'hue-rotate-90', 'blur-10px', 'noise-2', 'sepia-400', 'invert-20'];
+
+        if (switchButton && switchOnButton) {
+            switchButton.addEventListener('click', () => {
+                switchButton.classList.add('hidden');
+                switchOnButton.classList.remove('hidden');
+                if (video) video.classList.add(...FILTER_CLASSES);
+                if (previewCanvas) previewCanvas.classList.add(...FILTER_CLASSES);
+            });
+
+            switchOnButton.addEventListener('click', () => {
+                switchOnButton.classList.add('hidden');
+                switchButton.classList.remove('hidden');
+                if (video) video.classList.remove(...FILTER_CLASSES);
+                if (previewCanvas) previewCanvas.classList.remove(...FILTER_CLASSES);
+            });
+        }
+    })();
+</script>
 </body>
 </html>

@@ -4,6 +4,10 @@ const imageContainer = document.getElementById('image-container');
 const dataurl = document.getElementById('dataurl');
 const preview = document.getElementById('preview');
 
+if (preview) {
+  preview.width = 320;
+  preview.height = 280;
+}
 
 async function loadEnvConfig() {
   if (window.__ENV__) {
@@ -56,51 +60,62 @@ async function startCamera() {
 
 startCamera();
 
-button.addEventListener('click', async () => {
-      const envConfig = await loadEnvConfig();
-      const apiKey = envConfig.FACE_API_KEY ;
-      const apiSecret = envConfig.FACE_API_SECRET ;
+if (button) {
+  button.addEventListener('click', async () => {
+        const envConfig = await loadEnvConfig();
+        const apiKey = envConfig.FACE_API_KEY ;
+        const apiSecret = envConfig.FACE_API_SECRET ;
 
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      preview.src = canvas.toDataURL("image/png");
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-
-      var base64String = preview.src.split(',')[1];
-
-      $.ajax({
-        url: "https://api-us.faceplusplus.com/facepp/v3/detect",
-        type: "POST",
-        data: {
-          api_key: apiKey,
-          api_secret: apiSecret,
-          image_base64: base64String,
-          return_attributes: "smiling"
+        if (preview) {
+          preview.width = canvas.width;
+          preview.height = canvas.height;
+          const previewCtx = preview.getContext('2d');
+          previewCtx.clearRect(0, 0, preview.width, preview.height);
+          previewCtx.drawImage(canvas, 0, 0, preview.width, preview.height);
         }
+
+        const previewData = canvas.toDataURL("image/png");
+        var base64String = previewData.split(',')[1];
+
+        $.ajax({
+          url: "https://api-us.faceplusplus.com/facepp/v3/detect",
+          type: "POST",
+          data: {
+            api_key: apiKey,
+            api_secret: apiSecret,
+            image_base64: base64String,
+            return_attributes: "smiling"
+          }
+        })
+        .done(function(response) {
+          if (response.faces && response.faces.length > 0) {
+              console.log(JSON.stringify(response, null, 2));
+              var smileValue = response.faces[0].attributes.smile;
+              var isSmiling = smileValue.value > smileValue.threshold;
+              if (isSmiling) {
+                  window.open("fun.html", "_blank");
+              } else {
+                  alert("No smile detected. Please try again.");
+              }
+          }
       })
-      .done(function(response) {
-        if (response.faces && response.faces.length > 0) {
-            console.log(JSON.stringify(response, null, 2));
-            var smileValue = response.faces[0].attributes.smile;
-            var isSmiling = smileValue.value > smileValue.threshold;
-            if (isSmiling) {
-                window.open("fun.html", "_blank");
-            } else {
-                alert("No smile detected. Please try again.");
-            }
-        }
-    })
-    .fail(function(jqXHR) {
-        console.error(jqXHR.responseText);
-    });
-      video.pause();
-      video.srcObject = null;
+      .fail(function(jqXHR) {
+          console.error(jqXHR.responseText);
+      });
+        video.pause();
+        video.srcObject = null;
 
-});
+  });
+}
 
+
+// Switch/filter logic moved to fun.html to keep scope page-specific
 
 
