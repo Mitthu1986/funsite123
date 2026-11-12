@@ -110,10 +110,28 @@ if (button) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64 })
       });
-      const result = await response.json();
+      const responseText = await response.text();
+      let result = null;
+
+      if (responseText.trim()) {
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(`Smile detection returned an invalid response (HTTP ${response.status}).`);
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(result.error || 'Smile detection failed. Please try again.');
+        const message = result && typeof result.error === 'string'
+          ? result.error
+          : response.status === 404
+            ? 'The smile detection API route is missing. Redeploy the latest version.'
+            : `Smile detection failed (HTTP ${response.status}).`;
+        throw new Error(message);
+      }
+
+      if (!result || typeof result.isSmiling !== 'boolean' || typeof result.faceDetected !== 'boolean') {
+        throw new Error(`Smile detection returned an empty or incomplete response (HTTP ${response.status}).`);
       }
 
       if (result.isSmiling) {
