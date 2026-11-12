@@ -3,6 +3,7 @@ const button = document.getElementById('capture-button');
 const imageContainer = document.getElementById('image-container');
 const dataurl = document.getElementById('dataurl');
 const preview = document.getElementById('preview');
+const cameraStatus = document.getElementById('camera-status');
 const retryButton = document.getElementById('try-again-button');
 let cameraStream = null;
 
@@ -11,52 +12,16 @@ if (preview) {
   preview.height = 280;
 }
 
-async function loadEnvConfig() {
-  if (window.__ENV__) {
-    return window.__ENV__;
-  }
-
-  try {
-    const response = await fetch('./keys.env');
-    if (!response.ok) {
-      throw new Error(`Could not load env file: ${response.status}`);
-    }
-
-    const text = await response.text();
-    const values = {};
-
-    text.split(/\r?\n/).forEach((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) {
-        return;
-      }
-
-      const separatorIndex = trimmed.indexOf('=');
-      if (separatorIndex === -1) {
-        return;
-      }
-
-      const key = trimmed.slice(0, separatorIndex).trim();
-      const value = trimmed.slice(separatorIndex + 1).trim().replace(/^['"]|['"]$/g, '');
-      values[key] = value;
-    });
-
-    window.__ENV__ = values;
-    return values;
-  } catch (error) {
-    console.warn('Using built-in fallback values because the env file could not be loaded.', error);
-    return {};
+function showCameraStatus(message) {
+  if (cameraStatus) {
+    cameraStatus.textContent = message;
+    cameraStatus.classList.remove('hidden');
   }
 }
 
 async function startCamera() {
-  const status = document.getElementById('camera-status');
-
   const showCameraError = (message) => {
-    if (status) {
-      status.textContent = message;
-      status.classList.remove('hidden');
-    }
+    showCameraStatus(message);
   };
 
   if (!video) {
@@ -77,8 +42,8 @@ async function startCamera() {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     video.srcObject = cameraStream;
     await video.play();
-    if (status) {
-      status.classList.add('hidden');
+    if (cameraStatus) {
+      cameraStatus.classList.add('hidden');
     }
   } catch (error) {
     console.error('Camera access failed:', error);
@@ -110,61 +75,65 @@ startCamera();
 
 if (button) {
   button.addEventListener('click', async () => {
-        button.disabled = true;
-        const envConfig = await loadEnvConfig();
-        const apiKey = envConfig.FACE_API_KEY ;
-        const apiSecret = envConfig.FACE_API_SECRET ;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      showCameraStatus('The camera is not ready yet. Please wait and try again.');
+      return;
+    }
 
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    button.disabled = true;
+    if (retryButton) {
+      retryButton.hidden = true;
+    }
+    showCameraStatus('Checking your smile...');
 
-        if (preview) {
-          preview.width = canvas.width;
-          preview.height = canvas.height;
-          const previewCtx = preview.getContext('2d');
-          previewCtx.clearRect(0, 0, preview.width, preview.height);
-          previewCtx.drawImage(canvas, 0, 0, preview.width, preview.height);
-        }
+    try {
+      const maxDimension = 1280;
+      const scale = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
 
-        const previewData = canvas.toDataURL("image/png");
-        var base64String = previewData.split(',')[1];
+      const context = canvas.getContext('2d');
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        $.ajax({
-          url: "https://api-us.faceplusplus.com/facepp/v3/detect",
-          type: "POST",
-          data: {
-            api_key: apiKey,
-            api_secret: apiSecret,
-            image_base64: base64String,
-            return_attributes: "smiling"
-          }
-        })
-        .done(function(response) {
-          if (response.faces && response.faces.length > 0) {
-              console.log(JSON.stringify(response, null, 2));
-              var smileValue = response.faces[0].attributes.smile;
-              var isSmiling = smileValue.value > smileValue.threshold;
-              if (isSmiling) {
-                  window.open("fun.html", "_blank");
-              } else {
-                  alert("No smile detected. Please try again.");
-              }
-          }
-      })
-      .fail(function(jqXHR) {
-          console.error(jqXHR.responseText);
-      })
-      .always(function() {
-          stopCamera();
-          button.disabled = false;
-          if (retryButton) {
-              retryButton.hidden = false;
-          }
+      if (preview) {
+        preview.width = canvas.width;
+        preview.height = canvas.height;
+        const previewContext = preview.getContext('2d');
+        previewContext.clearRect(0, 0, preview.width, preview.height);
+        previewContext.drawImage(canvas, 0, 0, preview.width, preview.height);
+      }
+
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const response = await fetch('/api/detect-smile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64 })
       });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Smile detection failed. Please try again.');
+      }
+
+      if (result.isSmiling) {
+        window.location.assign('./fun.html');
+        return;
+      }
+
+      showCameraStatus(result.faceDetected
+        ? 'No smile detected. Please smile and try again.'
+        : 'No face detected. Move into the frame and try again.');
+    } catch (error) {
+      console.error('Smile detection failed:', error);
+      showCameraStatus(error.message || 'Smile detection failed. Please try again.');
+    } finally {
+      stopCamera();
+      button.disabled = false;
+      if (retryButton) {
+        retryButton.hidden = false;
+      }
+    }
   });
 }
 
