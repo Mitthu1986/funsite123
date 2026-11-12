@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make a wish!</title>
+    <link rel="stylesheet" href="src/output.css">
+    <link rel="stylesheet" href="main.css">
+    <style>
+        @font-face {
+            font-family: "Adorable";
+            src: url("./adorable.ttf") format("truetype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: #28182e;
+        }
+
+        .cake-page {
+            display: flex;
+            min-height: 100vh;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .cake-title {
+            margin: 0;
+            font-family: "Adorable", cursive;
+            font-size: clamp(2.5rem, 7vw, 5rem);
+            line-height: 1.1;
+            text-shadow: 0 2px 8px rgb(255 255 255 / 70%);
+        }
+
+        .cake-image {
+            display: block;
+            width: min(78vw, 560px);
+            max-height: 58vh;
+            object-fit: contain;
+            filter: drop-shadow(0 12px 18px rgb(0 0 0 / 22%));
+        }
+
+        .cake-cat {
+            width: min(70vw, 360px);
+            max-height: 32vh;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 14px rgb(0 0 0 / 20%));
+        }
+
+        .cake-instruction {
+            margin: 0;
+            max-width: 32rem;
+            border-radius: 1rem;
+            background: rgb(255 255 255 / 78%);
+            padding: 0.75rem 1.25rem;
+            font-size: clamp(1rem, 3vw, 1.25rem);
+        }
+
+        .heart-rain {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .heart-rain[hidden] {
+            display: none;
+        }
+ 
+        .heart-drop {
+            position: absolute;
+            top: -2.5rem;
+            line-height: 1;
+            animation: heart-fall var(--heart-duration) linear var(--heart-delay) forwards;
+            will-change: transform, opacity;
+        }
+
+        .heart-drop-blue {
+            color: #43a5ff;
+            filter: drop-shadow(0 2px 5px rgb(21 91 158 / 35%));
+        }
+
+        .heart-drop-white {
+            color: white;
+            filter: drop-shadow(0 2px 5px rgb(32 42 65 / 55%));
+        }
+
+        @keyframes heart-fall {
+            0% {
+                opacity: 0;
+                transform: translate3d(0, -6vh, 0) rotate(0deg);
+            }
+
+            12%, 82% {
+                opacity: 0.95;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate3d(var(--heart-drift), 110vh, 0) rotate(var(--heart-rotation));
+            }
+        }
+
+        @media (max-height: 600px) {
+            .cake-page {
+                gap: 0.5rem;
+                padding: 1rem;
+            }
+
+            .cake-image {
+                max-height: 48vh;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .cake-page {
+                min-height: 100svh;
+                justify-content: flex-start;
+                gap: 0.75rem;
+                padding: 1.25rem 1rem 2rem;
+            }
+
+            .cake-image {
+                width: min(88vw, 420px);
+                max-height: 44svh;
+            }
+
+            .cake-cat {
+                width: min(80vw, 320px);
+                max-height: 25svh;
+            }
+
+            .cake-page .site-button {
+                width: min(100%, 20rem);
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) {
+            .cake-page {
+                gap: 0.4rem;
+                padding: 0.5rem;
+            }
+
+            .cake-title {
+                font-size: clamp(2rem, 7vw, 3rem);
+            }
+
+            .cake-image {
+                width: min(50vw, 320px);
+                max-height: 35svh;
+            }
+
+            .cake-cat {
+                width: min(30vw, 200px);
+                max-height: 20svh;
+            }
+
+            .cake-instruction {
+                padding: 0.35rem 0.7rem;
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen w-full bg-[url('/bg.jpg')] bg-cover bg-center bg-no-repeat">
+    <main class="cake-page">
+        <h1 class="cake-title">Make a wish!</h1>
+        <img id="cake" class="cake-image" src="cakeu.gif" alt="A lit birthday cake">
+        <img id="cake-cat" class="cake-cat" src="cats-no-bg.gif" alt="A cat celebrating the birthday" hidden>
+        <p id="instruction" class="cake-instruction" role="status" aria-live="polite">
+            Blow into your microphone to put out the candle!
+        </p>
+        <button id="manual-blow-button" class="site-button" type="button">Blow out the candles</button>
+        <button id="blow-button" class="site-button" type="button">Enable microphone to blow</button>
+        <audio id="birthday-song" src="sub_clair-happy-birthday-578363.mp3" preload="none"></audio>
+        <button id="play-music-button" class="site-button" type="button" hidden>Play birthday music</button>
+    </main>
+    <div id="heart-rain" class="heart-rain" aria-hidden="true" hidden></div>
+    <script>
+        const cake = document.getElementById('cake');
+        const cakeCat = document.getElementById('cake-cat');
+        const heartRain = document.getElementById('heart-rain');
+        const instruction = document.getElementById('instruction');
+        const blowButton = document.getElementById('blow-button');
+        const manualBlowButton = document.getElementById('manual-blow-button');
+        const birthdaySong = document.getElementById('birthday-song');
+        const playMusicButton = document.getElementById('play-music-button');
+        let microphoneStream;
+        let audioContext;
+        let cakeBlownOut = false;
+        let heartRainInterval = null;
+
+        function startHeartRain() {
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || heartRainInterval !== null) return;
+
+            heartRain.hidden = false;
+            function createHeart(index) {
+                const heart = document.createElement('span');
+                heart.className = index % 2 === 0 ? 'heart-drop heart-drop-blue' : 'heart-drop heart-drop-white';
+                heart.textContent = '♥';
+                heart.style.left = `${Math.random() * 100}%`;
+                heart.style.fontSize = `${18 + Math.random() * 22}px`;
+                heart.style.setProperty('--heart-duration', `${3 + Math.random() * 2}s`);
+                heart.style.setProperty('--heart-delay', `${Math.random() * 1.5}s`);
+                heart.style.setProperty('--heart-drift', `${Math.random() * 180 - 90}px`);
+                heart.style.setProperty('--heart-rotation', `${Math.random() * 720 - 360}deg`);
+                heartRain.appendChild(heart);
+                heart.addEventListener('animationend', () => heart.remove(), { once: true });
+            }
+
+            for (let index = 0; index < 16; index += 1) createHeart(index);
+            heartRainInterval = window.setInterval(() => {
+                createHeart(Math.floor(Math.random() * 2));
+            }, 240);
+        }
+
+        async function playBirthdayMusic() {
+            try {
+                await birthdaySong.play();
+                playMusicButton.hidden = true;
+            } catch (error) {
+                console.error('Birthday music could not play:', error);
+                playMusicButton.hidden = false;
+                instruction.textContent = error.name === 'NotAllowedError'
+                    ? 'The candle is out! Tap to play the birthday music.'
+                    : 'The candle is out, but the birthday music could not be loaded.';
+            }
+        }
+
+        function stopListening() {
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach((track) => track.stop());
+                microphoneStream = null;
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close();
+                audioContext = null;
+            }
+        }
+
+        function blowOutCandles() {
+            if (cakeBlownOut) return;
+
+            cakeBlownOut = true;
+            cake.src = 'cakeb.png';
+            cake.alt = 'A birthday cake with its candle blown out';
+            cakeCat.hidden = false;
+            startHeartRain();
+            instruction.textContent = 'Happiest birthday!';
+            manualBlowButton.hidden = true;
+            blowButton.hidden = true;
+            stopListening();
+            playBirthdayMusic();
+        }
+
+        function listenForBlow(analyser) {
+            const samples = new Float32Array(analyser.fftSize);
+            const startedAt = performance.now();
+            const baselineReadings = [];
+            let loudSince = null;
+            let listeningStarted = false;
+            let baseline = 0;
+
+            function checkVolume(now) {
+                if (!microphoneStream || cakeBlownOut) return;
+
+                analyser.getFloatTimeDomainData(samples);
+                let squareSum = 0;
+                for (const sample of samples) squareSum += sample * sample;
+                const volume = Math.sqrt(squareSum / samples.length);
+                const elapsed = now - startedAt;
+
+                if (elapsed < 1000) {
+                    baselineReadings.push(volume);
+                    requestAnimationFrame(checkVolume);
+                    return;
+                }
+
+                if (!listeningStarted) {
+                    baselineReadings.sort((a, b) => a - b);
+                    baseline = baselineReadings.length
+                        ? baselineReadings[Math.floor((baselineReadings.length - 1) * 0.25)]
+                        : 0;
+                    listeningStarted = true;
+                    instruction.textContent = 'Now blow toward your microphone to put out the candle!';
+                }
+
+                const threshold = Math.max(0.01, baseline * 1.8);
+                if (volume >= threshold) {
+                    if (loudSince === null) loudSince = now;
+                    if (now - loudSince >= 140) {
+                        blowOutCandles();
+                        return;
+                    }
+                } else {
+                    loudSince = null;
+                }
+
+                requestAnimationFrame(checkVolume);
+            }
+
+            requestAnimationFrame(checkVolume);
+        }
+
+        manualBlowButton.addEventListener('click', blowOutCandles);
+        playMusicButton.addEventListener('click', playBirthdayMusic);
+
+        blowButton.addEventListener('click', async () => {
+            if (cakeBlownOut) return;
+
+            blowButton.disabled = true;
+            instruction.textContent = 'Allow microphone access, then blow toward your microphone!';
+
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Microphone access is not supported by this browser.');
+                }
+
+                microphoneStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    },
+                    video: false
+                });
+                if (cakeBlownOut) {
+                    stopListening();
+                    return;
+                }
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) {
+                    throw new Error('Audio detection is not supported by this browser.');
+                }
+
+                audioContext = new AudioContextClass();
+                await audioContext.resume();
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                audioContext.createMediaStreamSource(microphoneStream).connect(analyser);
+
+                instruction.textContent = 'Hold still while the microphone adjusts...';
+                blowButton.hidden = true;
+                listenForBlow(analyser);
+            } catch (error) {
+                console.error('Could not start cake blow detection:', error);
+                stopListening();
+                instruction.textContent = error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError'
+                    ? 'Microphone access was denied. Allow it in your browser settings, then try again.'
+                    : error.message || 'Could not start the microphone. Please try again.';
+                blowButton.disabled = false;
+                blowButton.textContent = 'Try again';
+            }
+        });
+    </script>
+</body>
+</html>

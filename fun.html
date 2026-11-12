@@ -5,75 +5,307 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <link rel="stylesheet" href="src/output.css">
+    <link rel="stylesheet" href="main.css">
 </head>
 <body class="min-h-screen w-full bg-[url('/bg.jpg')] bg-cover bg-center bg-no-repeat">
-     <div class="flex min-h-screen items-center justify-center pr-6 sm:pr-10 lg:pr-16 gap-6 ">
+     <div class="fun-layout">
         
-  <div class="relative flex h-[280px] w-[320px] max-w-[85vw] sm:h-[360px] sm:w-[420px]">
+    <div id="camera-stage" class="relative flex h-[280px] w-[320px] max-w-[85vw] sm:h-[360px] sm:w-[420px]">
+            <img
+                id="glasses-overlay"
+                src="glasses.png"
+                alt=""
+                aria-hidden="true"
+                class="pointer-events-none absolute left-0 top-0 z-10 hidden origin-center"
+            >
             <video
                 id="camera-feed"
                 class="absolute inset-0 mt-8 h-full w-full rounded-2xl border border-white/20 bg-black object-cover shadow-2xl"
                 autoplay
                 playsinline
                 muted
-            >
-                <canvas
-                    id="preview"
-                    aria-label="Captured preview"
-                    class="absolute inset-0 h-full w-full rounded-2xl border border-white/20 bg-transparent object-cover shadow-2xl"
-                ></canvas>
-            </video>
+            ></video>
+            <canvas
+                id="preview"
+                aria-label="Captured preview"
+                class="pointer-events-none absolute inset-0 hidden h-full w-full rounded-2xl border border-white/20 bg-transparent object-contain shadow-2xl"
+            ></canvas>
+            <p
+                id="camera-status"
+                role="status"
+                class="absolute inset-x-4 bottom-4 z-10 hidden rounded bg-black/75 px-3 py-2 text-center text-sm text-white"
+            ></p>
             <div
                 id="preview-frame-wrapper"
-                class="absolute inset-0 h-full w-full pointer-events-none"
+                class="pointer-events-none absolute inset-0 h-full w-full"
             >
                 <img
+                    id="photo-frame"
                     src="frame.png"
                     alt="Video frame"
                     class="absolute inset-0 h-full w-full object-contain scale-[1.4] sm:scale-[1.6] -mt-5"
                 >
             </div>
             </div>
-            <div class="group relative">
+            <div class="group relative flex flex-col items-center gap-3">
                 <img 
                 src="switch1.png"
                 id="switch"
                 class="mb-4 mr-4 h-150 w-150 cursor-pointer p-2 transition-transform duration-200 group-toggle:hidden sm:h-100 sm:w-100"
                 alt="Switch button"
                 />
-            //hello
                 <img
                 src="switchon.png"
                 id="switch-on"
                 class=" hidden mb-4 mr-4 h-150 w-150 cursor-pointer p-2 transition-transform duration-200 group-toggle:block sm:h-100 sm:w-100"
                 alt="Switch on button"
                 />
+                <button
+                    id="download-photo"
+                    type="button"
+                    class="hidden site-button"
+                >Download photo</button>
+                <a
+                    href="cake.html"
+                    class="site-button"
+                >✦ Next page ✦</a>
                 </div>
             </div>
 <script src="main.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 <script>
     (function() {
         const video = document.getElementById('camera-feed');
         const previewCanvas = document.getElementById('preview');
         const switchButton = document.getElementById('switch');
         const switchOnButton = document.getElementById('switch-on');
-        const FILTER_CLASSES = ['filter', 'contrast-100', 'brightness-150', 'saturate-100', 'hue-rotate-90', 'blur-10px', 'noise-2', 'sepia-400', 'invert-20'];
+        const frameImage = document.getElementById('photo-frame');
+        const frameWrapper = document.getElementById('preview-frame-wrapper');
+        const cameraStage = document.getElementById('camera-stage');
+        const cameraStatus = document.getElementById('camera-status');
+        const downloadButton = document.getElementById('download-photo');
+        const glassesImage = document.getElementById('glasses-overlay');
+        let glassesPose = null;
+        let photoCaptured = false;
+        let lastVideoTime = -1;
+
+        function updateGlasses(results) {
+            if (photoCaptured) {
+                glassesImage.classList.add('hidden');
+                return;
+            }
+
+            const landmarks = results.multiFaceLandmarks?.[0];
+            if (!landmarks || !landmarks[468] || !landmarks[473]) {
+                glassesPose = null;
+                glassesImage.classList.add('hidden');
+                return;
+            }
+
+            const leftIris = landmarks[468];
+            const rightIris = landmarks[473];
+            const stageWidth = cameraStage.clientWidth;
+            const stageHeight = cameraStage.clientHeight;
+            const scale = Math.max(stageWidth / video.videoWidth, stageHeight / video.videoHeight);
+            const renderedWidth = video.videoWidth * scale;
+            const renderedHeight = video.videoHeight * scale;
+            const leftX = leftIris.x * renderedWidth + (stageWidth - renderedWidth) / 2;
+            const leftY = leftIris.y * renderedHeight + (stageHeight - renderedHeight) / 2;
+            const rightX = rightIris.x * renderedWidth + (stageWidth - renderedWidth) / 2;
+            const rightY = rightIris.y * renderedHeight + (stageHeight - renderedHeight) / 2;
+            const eyeDistance = Math.hypot(rightX - leftX, rightY - leftY);
+            const width = eyeDistance / 0.48;
+            const height = width * glassesImage.naturalHeight / glassesImage.naturalWidth;
+            const angle = Math.atan2(rightY - leftY, rightX - leftX);
+            const target = {
+                centerX: (leftX + rightX) / 2,
+                centerY: (leftY + rightY) / 2 - height * 0.22,
+                width,
+                height,
+                angle
+            };
+
+            if (glassesPose) {
+                const smoothing = 0.35;
+                const angleDelta = Math.atan2(
+                    Math.sin(target.angle - glassesPose.angle),
+                    Math.cos(target.angle - glassesPose.angle)
+                );
+                target.centerX = glassesPose.centerX + (target.centerX - glassesPose.centerX) * smoothing;
+                target.centerY = glassesPose.centerY + (target.centerY - glassesPose.centerY) * smoothing;
+                target.width = glassesPose.width + (target.width - glassesPose.width) * smoothing;
+                target.height = glassesPose.height + (target.height - glassesPose.height) * smoothing;
+                target.angle = glassesPose.angle + angleDelta * smoothing;
+            }
+
+            glassesPose = target;
+            const videoOffsetY = video.getBoundingClientRect().top - cameraStage.getBoundingClientRect().top;
+            glassesImage.style.width = `${target.width}px`;
+            glassesImage.style.height = `${target.height}px`;
+            glassesImage.style.left = `${target.centerX - target.width / 2}px`;
+            glassesImage.style.top = `${target.centerY + videoOffsetY - target.height / 2}px`;
+            glassesImage.style.transform = `rotate(${target.angle}rad)`;
+            glassesImage.classList.remove('hidden');
+        }
+
+        async function trackFace() {
+            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.currentTime !== lastVideoTime) {
+                lastVideoTime = video.currentTime;
+                try {
+                    await faceMesh.send({ image: video });
+                } catch (error) {
+                    console.error('Face tracking failed:', error);
+                }
+            }
+            requestAnimationFrame(trackFace);
+        }
+
+        function startFaceTracking() {
+            if (!window.FaceMesh) {
+                cameraStatus.textContent = 'Glasses tracking could not load. Check your internet connection and reload.';
+                cameraStatus.classList.remove('hidden');
+                return;
+            }
+
+            faceMesh = new FaceMesh({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+            });
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            faceMesh.onResults(updateGlasses);
+            requestAnimationFrame(trackFace);
+        }
+
+        let faceMesh;
+
+        async function capturePhoto() {
+            if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) {
+                cameraStatus.textContent = 'The camera is not ready yet. Please wait and try again.';
+                cameraStatus.classList.remove('hidden');
+                return false;
+            }
+
+            try {
+                await frameImage.decode();
+                await glassesImage.decode();
+            } catch (error) {
+                cameraStatus.textContent = 'The photo frame or glasses could not be loaded.';
+                cameraStatus.classList.remove('hidden');
+                return false;
+            }
+
+            if (!glassesPose) {
+                cameraStatus.textContent = 'Keep your face in view until the glasses appear, then try again.';
+                cameraStatus.classList.remove('hidden');
+                return false;
+            }
+            const capturedPose = { ...glassesPose };
+
+            const pixelRatio = window.devicePixelRatio || 1;
+            const stageWidth = Math.round(cameraStage.clientWidth * pixelRatio);
+            const stageHeight = Math.round(cameraStage.clientHeight * pixelRatio);
+            const frameScale = Math.min(stageWidth / frameImage.naturalWidth, stageHeight / frameImage.naturalHeight);
+            const frameZoom = window.matchMedia('(min-width: 640px)').matches ? 1.6 : 1.4;
+            const frameWidth = frameImage.naturalWidth * frameScale * frameZoom;
+            const frameHeight = frameImage.naturalHeight * frameScale * frameZoom;
+            const frameX = (stageWidth - frameWidth) / 2;
+            const frameY = (stageHeight - frameHeight) / 2 - 20 * pixelRatio;
+            const offsetX = Math.ceil(Math.max(0, -frameX));
+            const offsetY = Math.ceil(Math.max(0, -frameY));
+            const width = stageWidth + offsetX + Math.ceil(Math.max(0, frameX + frameWidth - stageWidth));
+            const height = stageHeight + offsetY + Math.ceil(Math.max(0, frameY + frameHeight - stageHeight));
+            const context = previewCanvas.getContext('2d');
+            previewCanvas.width = width;
+            previewCanvas.height = height;
+
+            const videoScale = Math.max(stageWidth / video.videoWidth, stageHeight / video.videoHeight);
+            const videoWidth = video.videoWidth * videoScale;
+            const videoHeight = video.videoHeight * videoScale;
+            context.drawImage(
+                video,
+                offsetX + (stageWidth - videoWidth) / 2,
+                offsetY + (stageHeight - videoHeight) / 2,
+                videoWidth,
+                videoHeight
+            );
+            if (glassesPose) {
+                context.save();
+                context.translate(
+                    offsetX + capturedPose.centerX * pixelRatio,
+                    offsetY + capturedPose.centerY * pixelRatio
+                );
+                context.rotate(capturedPose.angle);
+                context.drawImage(
+                    glassesImage,
+                    -capturedPose.width * pixelRatio / 2,
+                    -capturedPose.height * pixelRatio / 2,
+                    capturedPose.width * pixelRatio,
+                    capturedPose.height * pixelRatio
+                );
+                context.restore();
+            }
+            context.drawImage(
+                frameImage,
+                offsetX + frameX,
+                offsetY + frameY ,
+                frameWidth,
+                frameHeight 
+            );
+
+            video.classList.add('hidden');
+            glassesImage.classList.add('hidden');
+            photoCaptured = true;
+            previewCanvas.classList.remove('hidden');
+            frameWrapper.classList.add('hidden');
+            cameraStatus.classList.add('hidden');
+            downloadButton.classList.remove('hidden');
+            return true;
+        }
+
+        function resetPhoto() {
+            const context = previewCanvas.getContext('2d');
+            context.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            previewCanvas.classList.add('hidden');
+            video.classList.remove('hidden');
+            photoCaptured = false;
+            if (glassesPose) glassesImage.classList.remove('hidden');
+            else glassesImage.classList.add('hidden');
+            frameWrapper.classList.remove('hidden');
+            downloadButton.classList.add('hidden');
+        }
 
         if (switchButton && switchOnButton) {
-            switchButton.addEventListener('click', () => {
+            switchButton.addEventListener('click', async () => {
                 switchButton.classList.add('hidden');
                 switchOnButton.classList.remove('hidden');
-                if (video) video.classList.add(...FILTER_CLASSES);
-                if (previewCanvas) previewCanvas.classList.add(...FILTER_CLASSES);
+                if (!await capturePhoto()) {
+                    switchOnButton.classList.add('hidden');
+                    switchButton.classList.remove('hidden');
+                }
             });
 
             switchOnButton.addEventListener('click', () => {
                 switchOnButton.classList.add('hidden');
                 switchButton.classList.remove('hidden');
-                if (video) video.classList.remove(...FILTER_CLASSES);
-                if (previewCanvas) previewCanvas.classList.remove(...FILTER_CLASSES);
+                resetPhoto();
             });
         }
+
+        downloadButton.addEventListener('click', () => {
+            const imageUrl = previewCanvas.toDataURL('image/png');
+            const downloadLink = document.createElement('a');
+            downloadLink.href = imageUrl;
+            downloadLink.download = 'funsite-photo.png';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+        });
+
+        startFaceTracking();
     })();
 </script>
 </body>

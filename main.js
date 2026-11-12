@@ -48,13 +48,46 @@ async function loadEnvConfig() {
 }
 
 async function startCamera() {
+  const status = document.getElementById('camera-status');
+
+  const showCameraError = (message) => {
+    if (status) {
+      status.textContent = message;
+      status.classList.remove('hidden');
+    }
+  };
+
+  if (!video) {
+    return;
+  }
+
+  if (!window.isSecureContext) {
+    showCameraError('Camera access requires HTTPS or localhost. Open this page from a local web server.');
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showCameraError('This browser does not support camera access.');
+    return;
+  }
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     video.srcObject = stream;
     await video.play();
+    if (status) {
+      status.classList.add('hidden');
+    }
   } catch (error) {
     console.error('Camera access failed:', error);
     video.poster = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="320" height="280" viewBox="0 0 320 280"%3E%3Crect width="320" height="280" fill="%23000"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23fff" font-size="20" font-family="Arial"%3ECamera unavailable%3C/text%3E%3C/svg%3E';
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      showCameraError('Camera permission was denied. Allow camera access in your browser settings, then reload.');
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      showCameraError('No camera was found. Connect a camera and reload.');
+    } else {
+      showCameraError('Could not start the camera. Check browser permissions and that no other app is using it.');
+    }
   }
 }
 
