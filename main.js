@@ -3,6 +3,8 @@ const button = document.getElementById('capture-button');
 const imageContainer = document.getElementById('image-container');
 const dataurl = document.getElementById('dataurl');
 const preview = document.getElementById('preview');
+const retryButton = document.getElementById('try-again-button');
+let cameraStream = null;
 
 if (preview) {
   preview.width = 320;
@@ -72,14 +74,15 @@ async function startCamera() {
   }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    video.srcObject = stream;
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    video.srcObject = cameraStream;
     await video.play();
     if (status) {
       status.classList.add('hidden');
     }
   } catch (error) {
     console.error('Camera access failed:', error);
+    stopCamera();
     video.poster = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="320" height="280" viewBox="0 0 320 280"%3E%3Crect width="320" height="280" fill="%23000"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23fff" font-size="20" font-family="Arial"%3ECamera unavailable%3C/text%3E%3C/svg%3E';
     if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
       showCameraError('Camera permission was denied. Allow camera access in your browser settings, then reload.');
@@ -91,10 +94,23 @@ async function startCamera() {
   }
 }
 
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+  }
+
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+}
+
 startCamera();
 
 if (button) {
   button.addEventListener('click', async () => {
+        button.disabled = true;
         const envConfig = await loadEnvConfig();
         const apiKey = envConfig.FACE_API_KEY ;
         const apiSecret = envConfig.FACE_API_SECRET ;
@@ -141,13 +157,22 @@ if (button) {
       })
       .fail(function(jqXHR) {
           console.error(jqXHR.responseText);
+      })
+      .always(function() {
+          stopCamera();
+          button.disabled = false;
+          if (retryButton) {
+              retryButton.hidden = false;
+          }
       });
-        video.pause();
-        video.srcObject = null;
-
   });
 }
 
+if (retryButton) {
+  retryButton.addEventListener('click', () => window.location.reload());
+}
+
+window.addEventListener('pagehide', stopCamera);
 
 
 

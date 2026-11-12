@@ -30,6 +30,23 @@
   white-space: nowrap;
 }
 
+.capture-actions {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 1rem);
+  gap: 0.5rem;
+  transform: translateX(-50%);
+}
+
+.capture-actions .site-button {
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+}
+
 .fun-layout {
   display: flex;
   min-height: 100vh;
